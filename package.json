@@ -1,7 +1,7 @@
 {
   "name": "auto-sequelize-define",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.1",
+  "description": "Auto generate sequelize define code by mysql sql export file",
   "main": "lib/index",
   "types": [
     "./index.d.ts"
