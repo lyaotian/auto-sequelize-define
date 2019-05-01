@@ -7,7 +7,7 @@
     "./index.d.ts"
   ],
   "scripts": {
-    "w": "tsc -w"
+    "start": "tsc -w"
   },
   "keywords": [
     "sequelize",
