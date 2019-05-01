@@ -6,11 +6,11 @@ Auto generate sequelize define code by mysql sql export file
 npm install auto-sequelize-define -D
 ```
 ```
-import run = require('auto-sequelize-define')
+import auto = require('auto-sequelize-define')
 import path = require('path')
 const root = path.resolve(__dirname, "../")
 
-run({
+auto.run({
     input_sql_file: '...',
     output_dir: '...',
     force_output: true,

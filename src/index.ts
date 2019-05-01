@@ -109,44 +109,46 @@ const copyTo = (dir: string, isForce = false) => {
     })
 }
 
-export = (options: Options) => {
-    // copyTo(options.output_dir)
-
-    const map = new Map<string, string[]>()
-    let lineCount = 0;
-    let readingTable: string = ''
-    fs.createReadStream(options.input_sql_file)
-        .pipe(es.split())
-        .pipe(es.mapSync((line: string) => {
-            line = line.trim()
-            if (line.startsWith(TABLE_START)) {
-                let start = TABLE_START.length
-                let end = line.lastIndexOf('`')
-                readingTable = line.substring(start, end)
-                map.set(readingTable, [])
-            } else {
-                if (readingTable.length > 0) {
-                    if (line.startsWith('`') || line.startsWith(PRIMARY_START)) {
-                        let properties: string[] | undefined = map.get(readingTable)
-                        if (properties) {
-                            properties.push(line)
+export = {
+    run: (options: Options) => {
+        // copyTo(options.output_dir)
+    
+        const map = new Map<string, string[]>()
+        let lineCount = 0;
+        let readingTable: string = ''
+        fs.createReadStream(options.input_sql_file)
+            .pipe(es.split())
+            .pipe(es.mapSync((line: string) => {
+                line = line.trim()
+                if (line.startsWith(TABLE_START)) {
+                    let start = TABLE_START.length
+                    let end = line.lastIndexOf('`')
+                    readingTable = line.substring(start, end)
+                    map.set(readingTable, [])
+                } else {
+                    if (readingTable.length > 0) {
+                        if (line.startsWith('`') || line.startsWith(PRIMARY_START)) {
+                            let properties: string[] | undefined = map.get(readingTable)
+                            if (properties) {
+                                properties.push(line)
+                            }
+                        } else {
+                            readingTable = ''
                         }
-                    } else {
-                        readingTable = ''
                     }
                 }
-            }
-
-            lineCount += 1;
-        })
-            .on('error', function () {
-                console.log('Error while reading file.' + lineCount);
+    
+                lineCount += 1;
             })
-            .on('end', function () {
-                fs.emptyDirSync(outDir)
-                toModels(map).map(model => toCodes(model))
-                copyTo(options.output_dir, options.force_output)
-                console.log('Read entire file.' + lineCount)
-            })
-        );
+                .on('error', function () {
+                    console.log('Error while reading file.' + lineCount);
+                })
+                .on('end', function () {
+                    fs.emptyDirSync(outDir)
+                    toModels(map).map(model => toCodes(model))
+                    copyTo(options.output_dir, options.force_output)
+                    console.log('Read entire file. lineCount=' + lineCount)
+                })
+            );
+    }
 }
