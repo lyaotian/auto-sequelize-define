@@ -28,22 +28,20 @@ let outDir = root + '/output'
 //   `update_time` bigint(20) NOT NULL DEFAULT '0' COMMENT '更新时间戳',
 
 const getFieldType = (input: string): string => {
-    if (input == 'tinyint(1)') {
-        return 'Sequelize.BOOLEAN'
+    if (input.startsWith('tinyint')) {
+        return 'int8'
     } else if (input == 'timestamp') {
-        return 'Sequelize.DATE'
+        return 'time.Time'
     } else if (input.startsWith('bigint')) {
-        return 'Sequelize.BIGINT'
-    } else if (input.indexOf('char') >= 0) {
-        return 'Sequelize.STRING'
-    } else if (input.indexOf('text') >= 0) {
-        return 'Sequelize.TEXT'
+        return 'int64'
+    } else if (input.startsWith('varchar') || input.startsWith('char') || input.indexOf('text') >= 0) {
+        return 'string'
     } else if (input.indexOf('int') >= 0) {
-        return 'Sequelize.INTEGER'
-    } else if (input.indexOf('float') >= 0) {
-        return 'Sequelize.FLOAT'
+        return 'int'
+    } else if (input.startsWith('decimal') || input.indexOf('float') >= 0) {
+        return 'float32'
     } else if (input.indexOf('double') >= 0) {
-        return 'Sequelize.DOUBLE'
+        return 'float64'
     }
     throw new Error('unknow type')
 }
@@ -54,11 +52,29 @@ const toFields = (lines: string[]): Field[] => {
         if (!line.startsWith(PRIMARY_START)) {
             let f = new Field()
             let array = line.split(' ')
-            f.name = array[0].substring(1, array[0].length - 1)
+            f.name = toCamelName(array[0].substring(1, array[0].length - 1))
             f.type = getFieldType(array[1])
+            f.sqlType = array[1]
             f.isNullable = line.indexOf('NOT NULL') < 0
-            f.defaultValue = array[array.findIndex(item => item == 'DEFAULT') + 1]
-            f.comment = array[array.findIndex(item => item == 'COMMENT') + 1]
+            let defaultValueIndex = array.findIndex(item => item == 'DEFAULT')
+            if (defaultValueIndex >= 0) {
+                f.defaultValue = array[array.findIndex(item => item == 'DEFAULT') + 1]
+                if (f.defaultValue.endsWith(',')) {
+                    f.defaultValue = f.defaultValue.substring(0, f.defaultValue.length - 1)
+                }
+                if (f.defaultValue.startsWith("'") && f.defaultValue.endsWith("'")) {
+                    f.defaultValue = f.defaultValue.substring(1, f.defaultValue.length - 1)
+                }
+            }
+            let commentIndex = array.findIndex(item => item == 'COMMENT')
+            if (commentIndex >= 0) {
+                f.comment = array[array.findIndex(item => item == 'COMMENT') + 1]
+                if (f.comment.endsWith(',')) {
+                    f.comment = f.comment.substring(1, f.comment.length - 1)
+                }
+                f.comment = f.comment.replace(/"/g, '')
+                f.comment = f.comment.replace(/'/g, '')
+            }
             fields.push(f)
         }
     }
@@ -81,20 +97,45 @@ const toModels = (map: Map<string, string[]>): Model[] => {
     for (let key of map.keys()) {
         let value = map.get(key)
         let model = new Model()
-        model.table = key.substring(3, key.length)
-        if (model.table == 'admin_user') {
-                console.log('')
+        model.table = key.substring('tb_'.length, key.length)
+        model.fields = toFields(value || []).filter(v => {return v.name != 'Id' && v.name != 'CreateTime' && v.name != 'UpdateTime'})
+        if (model.table == 'coupon') {
+            console.log('')
         }
-        model.fields = toFields(value || [])
         models.push(model)
     }
     return models
 }
 
+function toCamelName(input = '', divide = '_'): string {
+    let result = input;
+    let divideIndex = input.indexOf(divide);
+    if (divideIndex == 0) {
+        return toCamelName(input.substring(1), divide);
+    }
+    if (divideIndex >= 0) {
+        result = '';
+        let items = input.split(divide);
+        let count = items.length;
+        for (let i = 0; i < count; i++) {
+            let item = items[i];
+            if (item.length > 0) {
+                let firstChar = item.substr(0, 1);
+                result += ((i == 0 ? firstChar.toUpperCase() : firstChar.toUpperCase()) + item.substring(1));
+            } else {
+                result += item;
+            }
+        }
+    } else {
+        result = result.substr(0, 1).toUpperCase() + result.substring(1);
+    }
+    return result;
+}
+
 const toCodes = (model: Model): void => {
     let template = fs.readFileSync(root + '/src/define.mustache', 'utf8')
-    let code = mustache.render(template, { ...model })
-    fs.writeFileSync(`${outDir}/${model.table}.ts`, code)
+    let code = mustache.render(template, { ...model, ...{name: toCamelName(model.table)} })
+    fs.writeFileSync(`${outDir}/${model.table}.go`, code)
 }
 
 const copyTo = (dir: string, isForce = false) => {
@@ -145,8 +186,10 @@ export = {
                 })
                 .on('end', function () {
                     fs.emptyDirSync(outDir)
-                    toModels(map).map(model => toCodes(model))
-                    copyTo(options.output_dir, options.force_output)
+                    toModels(map).map(model => {
+                        toCodes(model)
+                    })
+                    // copyTo(options.output_dir, options.force_output)
                     console.log('Read entire file. lineCount=' + lineCount)
                 })
             );

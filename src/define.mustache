@@ -1,35 +1,16 @@
-import Sequelize = require('sequelize')
-const service = require('feathers-sequelize')
+package model
 
-//约定:表名同该文件名
-const lastSlashIndex = __filename.lastIndexOf("/")
-const lastDotIndex = __filename.lastIndexOf(".")
-const tableName = 'tb_' + '{{{table}}}'
+import (
+	"github.com/jinzhu/gorm"
+)
 
-const fields = {
+type {{name}} struct {
+	BaseModel
   {{#fields}}
-    {{name}}: {
-        type: {{type}},
-        allowNull: {{#isNullable}}true{{/isNullable}}{{^isNullable}}false{{/isNullable}},
-        {{#isPrimaryKey}}
-        primaryKey: true,
-        autoIncrement: true,
-        {{/isPrimaryKey}}
-    },
-    {{/fields}}
+	{{name}} {{type}}     `gorm:"{{#defaultValue}}DEFAULT:{{/defaultValue}}{{{defaultValue}}}{{#defaultValue}};{{/defaultValue}}{{^isNullable}}NOT NULL;{{/isNullable}}{{#comment}}COMMENT:{{/comment}}{{#comment}}'{{/comment}}{{{comment}}}{{#comment}}'{{/comment}}" sql:"type:{{{sqlType}}};"`
+  {{/fields}}
 }
 
-const classMethods = {
-    associate(models: any[]) {
-
-    }
-}
-
-export = function (sequelize: Sequelize.Sequelize) {
-    let options = {
-        tableName,
-        classMethods
-    }
-    let Model = sequelize.define(tableName, fields, options)
-    return Model
+func ({{name}}) TableName() string {
+	return gorm.DefaultTableNameHandler(nil, "{{table}}")
 }
